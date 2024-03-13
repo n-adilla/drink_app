@@ -1,6 +1,7 @@
-// ignore_for_file: library_private_types_in_public_api
+// ignore_for_file: library_private_types_in_public_api, use_build_context_synchronously
 
 import 'package:drink_app/menu_list/coffee.dart';
+import 'package:drink_app/menu_list/john.dart';
 import 'package:drink_app/menu_list/tea.dart';
 import 'package:drink_app/models/drink.dart';
 import 'package:drink_app/models/order.dart';
@@ -65,9 +66,6 @@ class _AppState extends State<App> {
 
   void saveOrder() async {
     if (orders.isNotEmpty) {
-      setState(() {
-        isLoading = true;
-      });
       // Sending the order to the Telegram bot
       const botToken = telegramBotToken;
       const chatId = telegramChatId;
@@ -99,56 +97,85 @@ class _AppState extends State<App> {
         message +=
             '${uniqueOrder.drink.name} x ${uniqueOrder.quantity}: RM${(uniqueOrder.drink.price * uniqueOrder.quantity).toStringAsFixed(2)}\n';
       }
-      message += '-------------------\n';
+      message += '----------------------------\n';
       message += 'TOTAL: RM${orderPrice.toStringAsFixed(2)}\n';
-      message += '-------------------\n';
+      message += '----------------------------\n';
 
       final url =
           'https://api.telegram.org/bot$botToken/sendMessage?chat_id=$chatId&text=$message';
 
-      var response = await http.get(Uri.parse(url));
+      savingOrder() async {
+        setState(() {
+          isLoading = true;
+        });
 
-      if (response.statusCode == 200) {
-        // Order sent successfully
-        setState(() {
-          isLoading = false;
-          orders.clear();
-          _clearCustomerName;
-        });
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Order Sent'),
-            content: const Text('Your order has been sent successfully.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      } else {
-        setState(() {
-          isLoading = false;
-        });
-        // Failed to send order
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: const Text('Failed to send order. Please try again.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        var response = await http.get(Uri.parse(url));
+
+        if (response.statusCode == 200) {
+          // Order sent successfully
+          setState(() {
+            isLoading = false;
+            orders.clear();
+            _clearCustomerName;
+          });
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Order Sent'),
+              content: Text(
+                  'Your order has been sent successfully.\n\nCustomer\'s name: $_customerName\nTotal price: RM${orderPrice.toStringAsFixed(2)}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          setState(() {
+            isLoading = false;
+          });
+          // Failed to send order
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Error'),
+              content: const Text('Failed to send order. Please try again.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
       }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Order Confirmation'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                savingOrder();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -164,7 +191,7 @@ class _AppState extends State<App> {
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
-              fontSize: 26,
+              fontSize: 22,
               fontFamily: 'NotoSans',
             ),
           ),
@@ -209,7 +236,7 @@ class _AppState extends State<App> {
                   children: [
                     coffee(),
                     tea(),
-                    coffee(),
+                    john(),
                   ],
                 ),
               ),
@@ -252,6 +279,7 @@ class _AppState extends State<App> {
     return Container(
       color: Colors.brown.shade100,
       child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 60),
         itemCount: coffeeMenu.length,
         itemBuilder: (context, index) {
           var drink = coffeeMenu[index];
@@ -261,7 +289,10 @@ class _AppState extends State<App> {
           );
 
           return ListTile(
-            title: Text(drink.name),
+            title: Text(
+              drink.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             subtitle: Text('RM ${drink.price.toStringAsFixed(2)}'),
             trailing: order != null
                 ? Row(
@@ -293,8 +324,9 @@ class _AppState extends State<App> {
 
   Widget tea() {
     return Container(
-      color: Colors.orangeAccent.shade100,
+      color: Colors.brown.shade100,
       child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 60),
         itemCount: teaMenu.length,
         itemBuilder: (context, index) {
           var drink = teaMenu[index];
@@ -304,7 +336,57 @@ class _AppState extends State<App> {
           );
 
           return ListTile(
-            title: Text(drink.name),
+            title: Text(
+              drink.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('RM ${drink.price.toStringAsFixed(2)}'),
+            trailing: order != null
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () => removeOrder(order),
+                        icon: const Icon(Icons.remove),
+                      ),
+                      Text(order.quantity.toString()),
+                      IconButton(
+                        onPressed: () => {
+                          print('Clicked on ADD ${drink.name}'),
+                          addOrder(drink)
+                        },
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  )
+                : IconButton(
+                    onPressed: () => addOrder(drink),
+                    icon: const Icon(Icons.add),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget john() {
+    return Container(
+      color: Colors.brown.shade100,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 60),
+        itemCount: johnMenu.length,
+        itemBuilder: (context, index) {
+          var drink = johnMenu[index];
+          var order = orders.firstWhere(
+            (order) => order.drink.name == drink.name,
+            orElse: () => Order(drink, 0),
+          );
+
+          return ListTile(
+            title: Text(
+              drink.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             subtitle: Text('RM ${drink.price.toStringAsFixed(2)}'),
             trailing: order != null
                 ? Row(
